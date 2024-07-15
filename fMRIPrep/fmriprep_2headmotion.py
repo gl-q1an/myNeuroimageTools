@@ -67,15 +67,17 @@ else:
 
 # RUN
 result_dict={}
-print(label)
 for i in label:
     if not i.startswith("sub-"):
         i = "sub-" + i
-    print(i)
     confounds_pattern = glob.glob(os.path.join(bid_res_dir,i,"func","*confounds*.tsv"))
-    print(confounds_pattern)
-    confounds_file = confounds_pattern[0]
-    result_dict[i] = filter_confounds(confounds_file)
+    if len(confounds_pattern) == 1:
+        confounds_file = confounds_pattern[0]
+        result_dict[i] = filter_confounds(confounds_file)
+    else:
+        result_dict[i] = -9
+        print(f"Warning: Skip {i}")
+
 
 df = pd.DataFrame(list(result_dict.items()), columns=['ID', 'HeadMotionQC'])
 df.to_csv(output,index=None)
