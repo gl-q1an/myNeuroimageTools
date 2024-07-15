@@ -40,14 +40,15 @@ def indentify_args(describe_dict):
     return args
 
 def extact_timeseries_ind(bold_file, path_to_atlas,connectivity_measure = "correlation"):
-    masker = NiftiLabelsMasker(labels_img=path_to_atlas, standardize=True)
-    correlation_measure = ConnectivityMeasure(kind=connectivity_measure, vectorize=True, discard_diagonal=True)
+    masker = NiftiLabelsMasker(labels_img=path_to_atlas, standardize="zscore_sample",standardize_confounds="zscore_sample",memory="nilearn_cache")
     img = nib.load(bold_file)
     conf, sample_mask = load_confounds_strategy(bold_file, denoise_strategy = 'simple', motion = 'basic', global_signal = 'basic')
     time_series = masker.fit_transform(img, confounds=conf, sample_mask=sample_mask)
     # You can remove the first 10 points here
+    correlation_measure = ConnectivityMeasure(kind=connectivity_measure, standardize="zscore_sample")
     correlation_matrix = correlation_measure.fit_transform([time_series])[0]
     z_transformed_matrix = np.arctanh(correlation_matrix)
+    np.fill_diagonal(z_transformed_matrix, 0)
     column_names = ['TimePoint_' + str(i) for i in sample_mask]
     index_names = ['ROI_' + str(int(i)) for i in masker.labels_]
     df = pd.DataFrame(time_series.T, columns=column_names, index=index_names)
@@ -72,13 +73,17 @@ else:
 if args.outdir is None:
     outdir = "."
 else:
-    outdir = args.output
+    outdir = args.outdir
+
+if not os.path.exists(outdir):
+    os.makedirs(outdir)
 
 # RUN
+error_log=0
 for i in label:
     if not i.startswith("sub-"):
         i = "sub-" + i
-    bold_file_pattern = glob.glob(os.path.join(bid_res_dir,i,"func","*_task-rest_*_desc-preproc_bold*.tsv"))
+    bold_file_pattern = glob.glob(os.path.join(bid_res_dir,i,"func","*_task-rest_*_desc-preproc_bold.nii.gz"))
 
     if len(bold_file_pattern) == 0:
          raise ValueError("Error: There is no file matching bold file pattern")
@@ -86,9 +91,23 @@ for i in label:
         print("The elements in bold file pattern are not exactly one.")
         print(f"Choose the first: {bold_file_pattern[0]}")
     
-    bold_file = bold_file_pattern[0]
-    df, z_transformed_matrix = extact_timeseries_ind(bold_file, args.atlas)
-    if args.connect:
-        np.save(os.path.join(outdir,f"{i}_z-connoect"), z_transformed_matrix, allow_pickle=True)
+    if len(bold_file_pattern) != 1:
+        if error_log == 0:
+            error_log = 1
+            now = datetime.datetime.now()
+            formatted_now = now.strftime('%Y%m%d%H%M%S')
+            error_log_path = os.path.join(outdir,f"error_sub{formatted_now}.log")
+            with open(error_log_path, 'w') as f:
+                f.write("No matching functional imaging:\n")
+                f.write(f"{i}\n")
+        else:
+            with open(error_log_path, 'a') as f:
+                f.write(f"{i}\n")
     else:
-        df.to_csv(os.path.join(outdir,f"{i}_timeseires.csv"))
+        bold_file = bold_file_pattern[0]
+        df, z_transformed_matrix = extact_timeseries_ind(bold_file, args.atlas)
+        if args.connect:
+            np.save(os.path.join(outdir,f"{i}_z-connoect"), z_transformed_matrix, allow_pickle=True)
+        else:
+            np.save(os.path.join(outdir,f"{i}_z-connect"), z_transformed_matrix, allow_pickle=True)
+            df.to_csv(os.path.join(outdir,f"{i}_timeseires.csv"))
