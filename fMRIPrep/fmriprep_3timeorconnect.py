@@ -9,6 +9,8 @@ import argparse
 import glob
 import datetime
 import numpy as np
+from nilearn import plotting
+import matplotlib.pyplot as plt
 import nibabel as nib
 from nilearn.maskers import NiftiLabelsMasker
 from nilearn.connectome import ConnectivityMeasure
@@ -47,6 +49,7 @@ def extact_timeseries_ind(bold_file, path_to_atlas,connectivity_measure = "corre
     # You can remove the first 10 points here
     correlation_measure = ConnectivityMeasure(kind=connectivity_measure, standardize="zscore_sample")
     correlation_matrix = correlation_measure.fit_transform([time_series])[0]
+    np.seterr(divide='ignore')
     z_transformed_matrix = np.arctanh(correlation_matrix)
     np.fill_diagonal(z_transformed_matrix, 0)
     column_names = ['TimePoint_' + str(i) for i in sample_mask]
@@ -84,25 +87,20 @@ for i in label:
     if not i.startswith("sub-"):
         i = "sub-" + i
     bold_file_pattern = glob.glob(os.path.join(bid_res_dir,i,"func","*_task-rest_*_desc-preproc_bold.nii.gz"))
-
-    if len(bold_file_pattern) == 0:
-         raise ValueError("Error: There is no file matching bold file pattern")
-    elif len(bold_file_pattern) != 1:
-        print("The elements in bold file pattern are not exactly one.")
-        print(f"Choose the first: {bold_file_pattern[0]}")
     
     if len(bold_file_pattern) != 1:
         if error_log == 0:
             error_log = 1
             now = datetime.datetime.now()
             formatted_now = now.strftime('%Y%m%d%H%M%S')
-            error_log_path = os.path.join(outdir,f"error_sub{formatted_now}.log")
+            error_log_path = os.path.join(outdir,f"error_sub_{formatted_now}.log")
             with open(error_log_path, 'w') as f:
                 f.write("No matching functional imaging:\n")
                 f.write(f"{i}\n")
         else:
             with open(error_log_path, 'a') as f:
                 f.write(f"{i}\n")
+        print(f"Warning:{i} in error_sub_{formatted_now}.log")
     else:
         bold_file = bold_file_pattern[0]
         df, z_transformed_matrix = extact_timeseries_ind(bold_file, args.atlas)
@@ -111,3 +109,8 @@ for i in label:
         else:
             np.save(os.path.join(outdir,f"{i}_z-connect"), z_transformed_matrix, allow_pickle=True)
             df.to_csv(os.path.join(outdir,f"{i}_timeseires.csv"))
+            plotting.plot_matrix(z_transformed_matrix, vmin = -1, vmax = 1)
+            plt.savefig(os.path.join(outdir,f"{i}_z-connectivity_matrix.png"), format='png')
+            plt.clf()
+            plt.close()
+        print(f"{i} is done successfully!")
