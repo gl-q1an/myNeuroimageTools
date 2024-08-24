@@ -11,7 +11,7 @@ export ATLAS_PATH=
 export activate=
 export env=
 
-mkdir -p 
+mkdir -p ${OUTPUT_DIR}
 
 fs_mind(){
     local sub=$1
@@ -29,6 +29,8 @@ fs_mind(){
 }
 
 export -f fs_mind
+
+jobs=5
 
 id_list=$(find ${SUBJECTS_DIR} -maxdepth 1 -type d -name 'sub-*' -printf "%f\n")
 echo $id_list | xargs -n 1 | parallel --jobs ${jobs}  fs_mind {}

@@ -10,8 +10,10 @@ import glob
 import datetime
 import numpy as np
 from nilearn import plotting
+from nilearn import image
 import matplotlib.pyplot as plt
 import nibabel as nib
+from nilearn.image import clean_img
 from nilearn.maskers import NiftiLabelsMasker
 from nilearn.connectome import ConnectivityMeasure
 from nilearn.interfaces.fmriprep import load_confounds_strategy
@@ -43,9 +45,10 @@ def indentify_args(describe_dict):
 
 def extact_timeseries_ind(bold_file, path_to_atlas,connectivity_measure = "correlation"):
     masker = NiftiLabelsMasker(labels_img=path_to_atlas, standardize="zscore_sample",standardize_confounds="zscore_sample",memory="nilearn_cache")
-    img = nib.load(bold_file)
+    img = image.load_img(bold_file)
     conf, sample_mask = load_confounds_strategy(bold_file, denoise_strategy = 'simple', motion = 'basic', global_signal = 'basic')
-    time_series = masker.fit_transform(img, confounds=conf, sample_mask=sample_mask)
+    cleaned_bold_img = clean_img(img,detrend=True, standardize=True, confounds=conf, low_pass=0.08, high_pass=0.01,t_r=2.0)
+    time_series = masker.fit_transform(cleaned_bold_img, sample_mask=sample_mask)
     # You can remove the first 10 points here
     correlation_measure = ConnectivityMeasure(kind=connectivity_measure, standardize="zscore_sample")
     correlation_matrix = correlation_measure.fit_transform([time_series])[0]

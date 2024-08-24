@@ -1,5 +1,8 @@
 #!/bin/bash
 
+# export SUBJECTS_DIR=
+
+
 mri_surf2surf --srcsubject fsaverage --trgsubject ${sub} --hemi lh --sval-annot ${annot_dir}/lh.HCP-MMP1.annot --tval ${fs_dir}/${sub}/label/lh.HCP-MMP1.annot
 mri_surf2surf --srcsubject fsaverage --trgsubject ${sub} --hemi rh --sval-annot ${annot_dir}/rh.HCP-MMP1.annot --tval ${fs_dir}/${sub}/label/rh.HCP-MMP1.annot
 
